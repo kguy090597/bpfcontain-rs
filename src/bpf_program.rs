@@ -269,6 +269,8 @@ fn attach_uprobes(skel: &mut BpfcontainSkel) -> Result<()> {
         }
     }
 
+    // CRIO INTEGARTION STUFF BEGINS
+    // Change all other uprobes to the handy one-liner
     let crio_binary_path = "/usr/local/bin/crio";
     let crio_main_func = "main.main";
 

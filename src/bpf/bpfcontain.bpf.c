@@ -2559,7 +2559,10 @@ int BPF_KPROBE(dockerd_container_running_enter)
     return 0;
 }
 
-// CRI-O TEST
+// CRI-O TEST MAIN FUNCTION
+// Currently attaching to main.main
+// If that works, want to attach to github.com/cri-o/cri-o/internal/oci.(*runtimeOCI).StartContainer
+// Once container has started, grab the pid and begin enforcement
 
 SEC("uprobe/crio_main")
 int BPF_KPROBE(crio_main_enter)
