@@ -2522,6 +2522,7 @@ int BPF_KPROBE(runc_x_cgo_init_enter)
     // We want to ignore these ones
     // It looks like they will share the same namespace as PID=1 and not have a new NS for children
     // We can check if PIDNS != subPidNS
+    bpf_printk("RUNC PROBE HIT");
     if (pidNs != subPidNs) { // We only care about the entry process to the container 
         // Add entries to the processes and containers map
         if (!start_docker_container()) {
@@ -2529,7 +2530,7 @@ int BPF_KPROBE(runc_x_cgo_init_enter)
             return 0;
         }
     }
-    
+
 	return 0;
 }
 
@@ -2543,6 +2544,7 @@ int BPF_KPROBE(dockerd_container_running_enter)
     // gcgo (which is what docker uses) passes arguments diffrently
     // Followed from https://blog.px.dev/ebpf-function-tracing/post/
     // (also helpful https://brendangregg.com/blog/2017-01-31/golang-bcc-bpf-function-tracing.html)
+    bpf_printk("DOCKER PROBE HIT");
     u32 pid = ctx->ax;
 
     container_t *container = get_container_by_host_pid(pid);
@@ -2556,6 +2558,109 @@ int BPF_KPROBE(dockerd_container_running_enter)
     
     return 0;
 }
+
+// CRI-O TEST
+
+SEC("uprobe/crio_main")
+int BPF_KPROBE(crio_main_enter)
+{
+
+   bpf_printk("CRIO MAIN CALL 1 ???");
+    
+    return 0;
+}
+
+/*
+SEC("uprobe/crio_container_running1")
+int BPF_KPROBE(crio_container_running_enter1)
+{
+
+    bpf_printk("CRIO CONTAINER START CALL 1 ???");
+    
+    return 0;
+}
+
+SEC("uprobe/crio_container_running2")
+int BPF_KPROBE(crio_container_running_enter2)
+{
+   bpf_printk("CRIO CONTAINER START CALL 2 ???");
+    
+    return 0;
+}
+
+SEC("uprobe/crio_container_running3")
+int BPF_KPROBE(crio_container_running_enter3)
+{
+
+   bpf_printk("CRIO CONTAINER START CALL 3 ???");
+    
+    return 0;
+}
+
+SEC("uprobe/crio_container_running4")
+int BPF_KPROBE(crio_container_running_enter4)
+{
+
+   bpf_printk("CRIO CONTAINER START CALL 4 ???");
+    
+    return 0;
+}
+
+SEC("uprobe/crio_container_running5")
+int BPF_KPROBE(crio_container_running_enter5)
+{
+
+   bpf_printk("CRIO CONTAINER START CALL 5 ???");
+    
+    return 0;
+}
+
+SEC("uprobe/crio_container_running6")
+int BPF_KPROBE(crio_container_running_enter6)
+{
+
+   bpf_printk("CRIO CONTAINER START CALL 6 ???");
+    
+    return 0;
+}
+
+SEC("uprobe/crio_container_running7")
+int BPF_KPROBE(crio_container_running_enter7)
+{
+
+   bpf_printk("CRIO CONTAINER START CALL 7 ???");
+    
+    return 0;
+}
+
+
+SEC("uprobe/crio_container_running8")
+int BPF_KPROBE(crio_container_running_enter8)
+{
+
+   bpf_printk("CRIO CONTAINER START CALL 8 ???");
+    
+    return 0;
+}
+
+SEC("uprobe/crictl_container_running")
+int BPF_KPROBE(crictl_container_running_enter)
+{
+
+   bpf_printk("CRICTL CONTAINER START CALL 1 ???");
+    
+    return 0;
+}
+
+SEC("uprobe/crictl_main")
+int BPF_KPROBE(crictl_main_enter)
+{
+
+   bpf_printk("CRICTL MAIN CALL 1 ???");
+    
+    return 0;
+}
+*/
 
 SEC("tp/syscalls/sys_enter_sethostname")
 int sys_enter_sethostname(struct trace_event_raw_sys_enter  *ctx)

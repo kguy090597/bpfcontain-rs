@@ -40,16 +40,40 @@ fn get_symbol_address(so_path: &str, fn_name: &str) -> Result<usize> {
     let file = object::File::parse(buffer.as_slice())?;
 
     let mut symbols = file.dynamic_symbols();
-    let symbol = symbols
-        .find(|symbol| {
-            if let Ok(name) = symbol.name() {
-                return name == fn_name;
-            }
-            false
-        })
-        .ok_or_else(|| anyhow!("symbol not found"))?;
-
-    Ok(symbol.address() as usize)
+    let mut kevinsymbols = file.symbols();
+    
+    if so_path != "/usr/bin/runc" {
+        println!("KEVIN DEBUG: {} SYMBOLS",so_path);
+        let kevinsymbol = kevinsymbols
+            .find(|kevinsymbol| {
+                if let Ok(name) = kevinsymbol.name() {
+                    //println!("KEVIN DEBUG 3: {:?}",kevinsymbol.name());
+                    if name == fn_name {
+                        println!("KEVIN DEBUG KEVINSYMBOL FOUND {}",name);
+                    }
+                    return name == fn_name;
+                }
+                false
+            })
+            .ok_or_else(|| anyhow!("symbol not found 2"))?;
+        Ok(kevinsymbol.address() as usize)
+    }
+    else{
+        println!("KEVIN DEBUG: {}",so_path);
+        let symbol = symbols
+	    .find(|symbol| {
+	        if let Ok(name) = symbol.name() {
+	            //println!("KEVIN DEBUG 2: {:?}",symbol.name());
+	            if name == fn_name {
+                        println!("KEVIN DEBUG SYMBOL FOUND {}",name);
+                    }
+	            return name == fn_name;
+	        }
+	        false
+	    })
+	    .ok_or_else(|| anyhow!("symbol not found"))?;
+	Ok(symbol.address() as usize)
+    }
 }
 
 pub struct BpfcontainContext<'a> {
@@ -244,6 +268,265 @@ fn attach_uprobes(skel: &mut BpfcontainSkel) -> Result<()> {
             );
         }
     }
+
+    let crio_binary_path = "/usr/local/bin/crio";
+    let crio_main_func = "main.main";
+
+    skel.links.crio_main_enter = skel.progs_mut().crio_main_enter().attach_uprobe_symbol(false,-1,&Path::new(crio_binary_path),crio_main_func)?.into();
+
+    /*let crio_binary_path = "/usr/local/bin/crio";
+    let crio_func_name9 = "main.main";
+
+    let crio_address9 = get_symbol_address(crio_binary_path, crio_func_name9);
+
+    match crio_address9 {
+        Ok(address) => {
+            println!("{:x}",address);
+            skel.links.crio_main_enter = skel
+                .progs_mut()
+                .crio_main_enter()
+                .attach_uprobe(false, -1, crio_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRIO support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }*/
+
+    /*// TODO: Dynamically lookup binary path
+    let crio_binary_path = "/usr/bin/crio";
+    let crio_func1_name = "github.com/cri-o/cri-o/internal/oci.(*Runtime).StartContainer";
+
+    let crio_address1 = get_symbol_address(crio_binary_path, crio_func1_name);
+
+    match crio_address1 {
+        Ok(address) => {
+            skel.links.crio_container_running_enter1 = skel
+                .progs_mut()
+                .crio_container_running_enter1()
+                .attach_uprobe(false, -1, crio_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRIO support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }
+    
+    // TODO: Dynamically lookup binary path
+    let crio_func2_name = "github.com/cri-o/cri-o/internal/oci.(*runtimeOCI).StartContainer";
+
+    let crio_address2 = get_symbol_address(crio_binary_path, crio_func2_name);
+
+    match crio_address2 {
+        Ok(address) => {
+            skel.links.crio_container_running_enter2 = skel
+                .progs_mut()
+                .crio_container_running_enter2()
+                .attach_uprobe(false, -1, crio_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRIO support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }
+    
+    // TODO: Dynamically lookup binary path
+    let crio_func3_name = "github.com/cri-o/cri-o/internal/oci.(*runtimeVM).StartContainer";
+
+    let crio_address3 = get_symbol_address(crio_binary_path, crio_func3_name);
+
+    match crio_address3 {
+        Ok(address) => {
+            skel.links.crio_container_running_enter3 = skel
+                .progs_mut()
+                .crio_container_running_enter3()
+                .attach_uprobe(false, -1, crio_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRIO support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }
+    
+    // TODO: Dynamically lookup binary path
+    let crio_func4_name = "github.com/cri-o/cri-o/internal/storage.(*runtimeService).StartContainer";
+
+    let crio_address4 = get_symbol_address(crio_binary_path, crio_func4_name);
+
+    match crio_address4 {
+        Ok(address) => {
+            skel.links.crio_container_running_enter4 = skel
+                .progs_mut()
+                .crio_container_running_enter4()
+                .attach_uprobe(false, -1, crio_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRIO support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }
+    
+    // TODO: Dynamically lookup binary path
+    let crio_func5_name = "/usr/bin/crio:github.com/cri-o/cri-o/server.(*Server).StartContainer";
+
+    let crio_address5 = get_symbol_address(crio_binary_path, crio_func5_name);
+
+    match crio_address5 {
+        Ok(address) => {
+            skel.links.crio_container_running_enter5 = skel
+                .progs_mut()
+                .crio_container_running_enter5()
+                .attach_uprobe(false, -1, crio_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRIO support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }
+    
+    // TODO: Dynamically lookup binary path
+    let crio_func6_name = "github.com/cri-o/cri-o/server/cri/v1.(*service).StartContainer";
+
+    let crio_address6 = get_symbol_address(crio_binary_path, crio_func6_name);
+
+    match crio_address6 {
+        Ok(address) => {
+            skel.links.crio_container_running_enter6 = skel
+                .progs_mut()
+                .crio_container_running_enter6()
+                .attach_uprobe(false, -1, crio_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRIO support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }
+    
+    // TODO: Dynamically lookup binary path
+    let crio_func7_name = "github.com/cri-o/cri-o/server/cri/v1alpha2.(*service).StartContainer";
+
+    let crio_address7 = get_symbol_address(crio_binary_path, crio_func7_name);
+
+    match crio_address7 {
+        Ok(address) => {
+            skel.links.crio_container_running_enter7 = skel
+                .progs_mut()
+                .crio_container_running_enter7()
+                .attach_uprobe(false, -1, crio_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRIO support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }
+
+    // TODO: Dynamically lookup binary path
+    let crio_func8_name = "k8s.io/cri-api/pkg/apis/runtime/v1.xxx_messageInfo_StartContainerRequest";
+
+    let crio_address8 = get_symbol_address(crio_binary_path, crio_func8_name);
+
+    match crio_address8 {
+        Ok(address) => {
+            skel.links.crio_container_running_enter8 = skel
+                .progs_mut()
+                .crio_container_running_enter8()
+                .attach_uprobe(false, -1, crio_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRIO support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }
+
+    // TODO: Dynamically lookup binary path
+    let crictl_binary_path = "/home/kevin/Desktop/cri-tools/build/bin/crictl";
+
+    let crictl_func_name = "main.StartContainer";
+
+    let crictl_address = get_symbol_address(crictl_binary_path, crictl_func_name);
+
+    match crictl_address {
+        Ok(address) => {
+            skel.links.crictl_container_running_enter = skel
+                .progs_mut()
+                .crictl_container_running_enter()
+                .attach_uprobe(false, -1, crictl_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRICTL support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }
+
+    let crictl_func_name2 = "main.main";
+
+    let crictl_address2 = get_symbol_address(crictl_binary_path, crictl_func_name2);
+
+    match crictl_address2 {
+        Ok(address) => {
+            skel.links.crictl_main_enter = skel
+                .progs_mut()
+                .crictl_main_enter()
+                .attach_uprobe(false, -1, crictl_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRICTL support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }
+
+    let crio_func_name9 = "main.main";
+
+    let crio_address9 = get_symbol_address(crictl_binary_path, crio_func_name9);
+
+    match crio_address9 {
+        Ok(address) => {
+            skel.links.crio_main_enter = skel
+                .progs_mut()
+                .crio_main_enter()
+                .attach_uprobe(false, -1, crio_binary_path, address)?
+                .into();
+        }
+        Err(e) => {
+            log::warn!(
+                "CRICTL support will not work! crio uprobe could not be attached: {}",
+                e
+            );
+        }
+    }*/
 
     Ok(())
 }
