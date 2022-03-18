@@ -294,6 +294,9 @@ fn attach_uprobes(skel: &mut BpfcontainSkel) -> Result<()> {
     let runc_start = "github.com/opencontainers/runc/libcontainer.(*linuxContainer).exec";
     skel.links.runc_start_enter = skel.progs_mut().runc_start_enter().attach_uprobe_symbol(false,-1,&Path::new(runc_binary_path),runc_start)?.into();
 
+    let runc_destroy = "main.destroy";
+    skel.links.runc_destroy_enter = skel.progs_mut().runc_destroy_enter().attach_uprobe_symbol(false,-1,&Path::new(runc_binary_path),runc_destroy)?.into();
+
     /*let crio_binary_path = "/usr/local/bin/crio";
     let crio_func_name9 = "main.main";
 

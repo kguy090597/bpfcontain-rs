@@ -2493,6 +2493,9 @@ out:
  * Docker Integration                                                           *
  * ========================================================================= */
 
+
+int PID = -1;
+
 /* Hook into Docker Container Creation
  *
  * Runc setups the entrypoint process of the Container. 
@@ -2546,9 +2549,10 @@ int BPF_KPROBE(dockerd_container_running_enter)
     // Followed from https://blog.px.dev/ebpf-function-tracing/post/
     // (also helpful https://brendangregg.com/blog/2017-01-31/golang-bcc-bpf-function-tracing.html)
     bpf_printk("DOCKER PROBE HIT");
-    u32 pid = ctx->ax;
-
-    container_t *container = get_container_by_host_pid(pid);
+    /*u32 pid = ctx->ax;
+    bpf_printk("DOCKER PROBE HIT PID: %d",pid);
+    bpf_printk("CURRENT STORED GLOBAL PID: %d",PID);
+    container_t *container = get_container_by_host_pid(PID);
     if (!container) {
         bpf_printk("DOCKER PROBE NO CONTAINER?");
         return 0;
@@ -2557,7 +2561,7 @@ int BPF_KPROBE(dockerd_container_running_enter)
     container->status = DOCKER_STARTED;
     bpf_printk("DOCKER PROBE STATUS STARTED");
     bpf_map_update_elem(&containers, &container->container_id, container, BPF_EXIST);
-    bpf_printk("DOCKER PROBE END");
+    bpf_printk("DOCKER PROBE END");*/
     
     return 0;
 }
@@ -2694,15 +2698,13 @@ int BPF_KPROBE(runc_init_proc_start_enter)
     return 0;
 }
 
-int PID = -1;
-
 SEC("uprobe/runc_wait_for_child_exit")
 int BPF_KPROBE(runc_wait_for_child_exit_enter)
 {
-    bpf_printk("RUNC WAIT FOR CHILD EXIT START");
+    bpf_printk("RUNC WAIT FOR CHILD EXIT");
     PID = ctx->bx;
-    /*bpf_printk("CONTAINER PID ?? -- %d",PID);
-    container_t *container = get_container_by_host_pid(PID);
+    bpf_printk("CONTAINER PID ?? -- %d",PID);
+    /*container_t *container = get_container_by_host_pid(PID);
     if (!container) {
         bpf_printk("RUNC PROBE NO CONTAINER?");
         return 0;
@@ -2719,18 +2721,26 @@ int BPF_KPROBE(runc_start_enter)
     
     bpf_printk("KEVIN RUNC START HIT");
 
-    /*container_t *container = get_container_by_host_pid(PID);
+    bpf_printk("CURRENT STORED GLOBAL PID: %d",PID);
+    container_t *container = get_container_by_host_pid(PID);
     if (!container) {
-        bpf_printk("RUNC PROBE NO CONTAINER?");
+        bpf_printk("NOT DOCKER PROBE NO CONTAINER?");
         return 0;
     }
 
     container->status = DOCKER_STARTED;
-    bpf_printk("RUNC PROBE STATUS STARTED");
+    bpf_printk("NOT DOCKER PROBE STATUS STARTED");
     bpf_map_update_elem(&containers, &container->container_id, container, BPF_EXIST);
-    bpf_printk("RUNC PROBE END");
-    PID = -1;*/
+    bpf_printk("NOT DOCKER PROBE END");
+    PID=-1;
 	return 0;
+}
+
+SEC("uprobe/runc_destroy")
+int BPF_KPROBE(runc_destroy_enter)
+{
+    
+    bpf_printk("KEVIN RUNC DESTROY HIT");
 }
 /*
 SEC("uprobe/crio_container_running1")
