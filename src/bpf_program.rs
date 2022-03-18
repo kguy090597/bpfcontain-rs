@@ -276,6 +276,24 @@ fn attach_uprobes(skel: &mut BpfcontainSkel) -> Result<()> {
 
     skel.links.crio_main_enter = skel.progs_mut().crio_main_enter().attach_uprobe_symbol(false,-1,&Path::new(crio_binary_path),crio_main_func)?.into();
 
+    let runc_start_container = "main.startContainer";
+    skel.links.runc_start_container_enter = skel.progs_mut().runc_start_container_enter().attach_uprobe_symbol(false,-1,&Path::new(runc_binary_path),runc_start_container)?.into();
+
+
+    let runc_create_container = "main.createContainer";
+    skel.links.runc_create_container_enter = skel.progs_mut().runc_create_container_enter().attach_uprobe_symbol(false,-1,&Path::new(runc_binary_path),runc_create_container)?.into();
+
+    let runc_new_init_process = "github.com/opencontainers/runc/libcontainer.(*linuxContainer).newInitProcess";
+    skel.links.runc_init_proc_enter = skel.progs_mut().runc_init_proc_enter().attach_uprobe_symbol(false,-1,&Path::new(runc_binary_path),runc_new_init_process)?.into();
+
+    skel.links.runc_init_proc_start_enter = skel.progs_mut().runc_init_proc_start_enter().attach_uprobe_symbol(false,-1,&Path::new(runc_binary_path),runc_new_init_process)?.into();
+
+    let runc_wait_for_child_exit = "github.com/opencontainers/runc/libcontainer.(*initProcess).waitForChildExit";
+    skel.links.runc_wait_for_child_exit_enter = skel.progs_mut().runc_wait_for_child_exit_enter().attach_uprobe_symbol(false,-1,&Path::new(runc_binary_path),runc_wait_for_child_exit)?.into();
+    
+    let runc_start = "github.com/opencontainers/runc/libcontainer.(*linuxContainer).exec";
+    skel.links.runc_start_enter = skel.progs_mut().runc_start_enter().attach_uprobe_symbol(false,-1,&Path::new(runc_binary_path),runc_start)?.into();
+
     /*let crio_binary_path = "/usr/local/bin/crio";
     let crio_func_name9 = "main.main";
 

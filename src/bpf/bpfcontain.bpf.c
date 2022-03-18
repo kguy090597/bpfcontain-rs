@@ -2526,11 +2526,12 @@ int BPF_KPROBE(runc_x_cgo_init_enter)
     if (pidNs != subPidNs) { // We only care about the entry process to the container 
         // Add entries to the processes and containers map
         if (!start_docker_container()) {
+            bpf_printk("RUNC PROBE SOMETHING ABOUT THIS");
             // TODO deal with error or log it
             return 0;
         }
     }
-
+    bpf_printk("RUNC PROBE END");
 	return 0;
 }
 
@@ -2549,12 +2550,14 @@ int BPF_KPROBE(dockerd_container_running_enter)
 
     container_t *container = get_container_by_host_pid(pid);
     if (!container) {
-        
+        bpf_printk("DOCKER PROBE NO CONTAINER?");
         return 0;
     }
 
     container->status = DOCKER_STARTED;
+    bpf_printk("DOCKER PROBE STATUS STARTED");
     bpf_map_update_elem(&containers, &container->container_id, container, BPF_EXIST);
+    bpf_printk("DOCKER PROBE END");
     
     return 0;
 }
@@ -2568,11 +2571,167 @@ SEC("uprobe/crio_main")
 int BPF_KPROBE(crio_main_enter)
 {
 
-   bpf_printk("CRIO MAIN CALL 1 ???");
+   //bpf_printk("CRIO MAIN CALL 1 ???");
+
+    return 0;
+}
+
+SEC("uprobe/runc_start_container")
+int BPF_KPROBE(runc_start_container_enter)
+{
+
+    //bpf_printk("RUNC START CONTAINER ???");
+    return 0;
+}
+
+SEC("uprobe/runc_create_container")
+int BPF_KPROBE(runc_create_container_enter)
+{
+    //bpf_printk("RUNC CREATE CONTAINER ???");
     
     return 0;
 }
 
+SEC("uprobe/runc_init_proc_probe") //uretprobe??
+int BPF_KPROBE(runc_init_proc_enter)
+{
+
+    /*
+    //  
+    //  - The size of explicitly sized basic types (int16, etc.) is the
+    //	  specified size.
+    //	- The size of strings and interfaces is 2*WordSize.
+    //	- The size of slices is 3*WordSize.
+    //	- The size of an array of n elements corresponds to the size of
+    //	  a struct of n consecutive fields of the array's element type.
+    //      - The size of a struct is the offset of the last field plus that
+    //	  field's size. As with all element types, if the struct is used
+    //	  in an array its size must first be aligned to a multiple of the
+    //	  struct's alignment.
+    //	- All other types have size WordSize.
+    //	- Arrays and structs are aligned per spec definition; all other
+    //	  types are naturally aligned with a maximum alignment MaxAlign.
+
+    //    WordSize should be 32 bits
+    //    strings and interfaces are 64 bits
+    //    
+
+    type initProcess struct {
+        cmd             *exec.Cmd           [struct] **************************************************************************************************************
+        messageSockPair filePair            [struct]
+        logFilePair     filePair            [struct]
+        config          *initConfig         [struct]
+        manager         cgroups.Manager     [interface]
+        intelRdtManager *intelrdt.Manager   [struct]
+        container       *linuxContainer     [struct]
+        fds             []string            [array]
+        process         *Process            [struct]
+        bootstrapData   io.Reader           [interface]
+        sharePidns      bool                [bool]
+    }
+
+    type Cmd struct {
+        Path string                         [String]
+        Args []string                       [Array]
+        Env []string                        [Array]
+        Dir string                          [String]
+        Stdin io.Reader                     [interface]
+        Stdout io.Writer                    [interface]
+        Stderr io.Writer                    [interface]
+        ExtraFiles []*os.File               [Array]
+        SysProcAttr *syscall.SysProcAttr    [struct]
+        Process *os.Process                 [struct] *************************************************************************************************
+        ProcessState *os.ProcessState       [struct]
+    }
+
+
+    type Process struct {
+	    Pid int                             [int] ****************************************************************************************************************
+    }
+
+    */
+
+    int cmdAddress;
+    int processAddress;
+
+
+    /*bpf_printk("RUNC INIT PROC CONTAINER FINISH");
+    bpf_printk("PT_REGS_PARM1 %x",PT_REGS_PARM1(ctx));
+    bpf_printk("PT_REGS_PARM2 %x",PT_REGS_PARM2(ctx));
+    bpf_printk("PT_REGS_PARM3 %x",PT_REGS_PARM3(ctx));
+    bpf_printk("PT_REGS_PARM4 %x",PT_REGS_PARM4(ctx));
+    bpf_printk("PT_REGS_PARM5 %x",PT_REGS_PARM5(ctx));
+    bpf_printk("PT_REGS_RET %x",PT_REGS_RET(ctx));
+    bpf_printk("PT_REGS_FP %x",PT_REGS_FP(ctx));
+    bpf_printk("PT_REGS_RC %x",PT_REGS_RC(ctx));
+    bpf_printk("PT_REGS_SP %x",PT_REGS_SP(ctx));
+    bpf_printk("PT_REGS_IP %x",PT_REGS_IP(ctx));*/
+    int test;
+    // what to do with return value from PT_REGS_RC(ctx) (return value should be of type initProcess)
+    //bpf_printk("RUNC INIT PROC CONTAINER FINISH");
+    return 0;
+}
+
+SEC("uprobe/runc_init_proc_start_probe") 
+int BPF_KPROBE(runc_init_proc_start_enter)
+{
+
+    /*bpf_printk("RUNC INIT PROC CONTAINER START");
+    bpf_printk("PT_REGS_PARM1 %x",PT_REGS_PARM1(ctx));
+    bpf_printk("PT_REGS_PARM2 %x",PT_REGS_PARM2(ctx));
+    bpf_printk("PT_REGS_PARM3 %x",PT_REGS_PARM3(ctx));
+    bpf_printk("PT_REGS_PARM4 %x",PT_REGS_PARM4(ctx));
+    bpf_printk("PT_REGS_PARM5 %x",PT_REGS_PARM5(ctx));
+    bpf_printk("PT_REGS_RET %x",PT_REGS_RET(ctx));
+    bpf_printk("PT_REGS_FP %x",PT_REGS_FP(ctx));
+    bpf_printk("PT_REGS_RC %x",PT_REGS_RC(ctx));
+    bpf_printk("PT_REGS_SP %x",PT_REGS_SP(ctx));
+    bpf_printk("PT_REGS_IP %x",PT_REGS_IP(ctx));
+    bpf_printk("RUNC INIT PROC CONTAINER START");*/
+    int test;
+    // what to do with return value from PT_REGS_RC(ctx) (return value should be of type initProcess)
+    
+    return 0;
+}
+
+int PID = -1;
+
+SEC("uprobe/runc_wait_for_child_exit")
+int BPF_KPROBE(runc_wait_for_child_exit_enter)
+{
+    bpf_printk("RUNC WAIT FOR CHILD EXIT START");
+    PID = ctx->bx;
+    /*bpf_printk("CONTAINER PID ?? -- %d",PID);
+    container_t *container = get_container_by_host_pid(PID);
+    if (!container) {
+        bpf_printk("RUNC PROBE NO CONTAINER?");
+        return 0;
+    }
+    container->status = DOCKER_INIT;
+    bpf_printk("RUNC PROBE STATUS INIT");
+    bpf_map_update_elem(&containers, &container->container_id, container, BPF_EXIST);*/
+    return 0;
+}
+
+SEC("uprobe/runc_start")
+int BPF_KPROBE(runc_start_enter)
+{
+    
+    bpf_printk("KEVIN RUNC START HIT");
+
+    /*container_t *container = get_container_by_host_pid(PID);
+    if (!container) {
+        bpf_printk("RUNC PROBE NO CONTAINER?");
+        return 0;
+    }
+
+    container->status = DOCKER_STARTED;
+    bpf_printk("RUNC PROBE STATUS STARTED");
+    bpf_map_update_elem(&containers, &container->container_id, container, BPF_EXIST);
+    bpf_printk("RUNC PROBE END");
+    PID = -1;*/
+	return 0;
+}
 /*
 SEC("uprobe/crio_container_running1")
 int BPF_KPROBE(crio_container_running_enter1)

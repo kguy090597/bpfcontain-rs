@@ -85,7 +85,7 @@ impl FindSymbolUprobeExt for libbpf_rs::Program {
         let offset = SymbolResolver::find_in_file(pathname, symbol)
             .context("Error finding symbol")?
             .context("Failed to find symbol")?;
-        println!("{:x}",offset);
+        println!("SYMBOL: {}, OFFSET: {:x}",symbol,offset);
 
         // Use the offset we found to attach the probe
         self.attach_uprobe(retprobe, pid, pathname, offset)
