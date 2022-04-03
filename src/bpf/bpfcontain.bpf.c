@@ -2548,291 +2548,129 @@ int BPF_KPROBE(dockerd_container_running_enter)
     // gcgo (which is what docker uses) passes arguments diffrently
     // Followed from https://blog.px.dev/ebpf-function-tracing/post/
     // (also helpful https://brendangregg.com/blog/2017-01-31/golang-bcc-bpf-function-tracing.html)
-    bpf_printk("DOCKER PROBE HIT");
-    /*u32 pid = ctx->ax;
-    bpf_printk("DOCKER PROBE HIT PID: %d",pid);
-    bpf_printk("CURRENT STORED GLOBAL PID: %d",PID);
-    container_t *container = get_container_by_host_pid(PID);
-    if (!container) {
-        bpf_printk("DOCKER PROBE NO CONTAINER?");
-        return 0;
-    }
+    // bpf_printk("DOCKER PROBE HIT");
+    //u32 pid = ctx->ax;
+    //bpf_printk("DOCKER PROBE HIT PID: %d",pid);
+    //bpf_printk("CURRENT STORED GLOBAL PID: %d",PID);
+    //container_t *container = get_container_by_host_pid(PID);
+    //if (!container) {
+    //    bpf_printk("DOCKER PROBE NO CONTAINER?");
+    //    return 0;
+    //}
 
-    container->status = DOCKER_STARTED;
-    bpf_printk("DOCKER PROBE STATUS STARTED");
-    bpf_map_update_elem(&containers, &container->container_id, container, BPF_EXIST);
-    bpf_printk("DOCKER PROBE END");*/
+    //container->status = DOCKER_STARTED;
+    //bpf_printk("DOCKER PROBE STATUS STARTED");
+    //bpf_map_update_elem(&containers, &container->container_id, container, BPF_EXIST);
+    //bpf_printk("DOCKER PROBE END");
     
     return 0;
 }
 
-// CRI-O TEST MAIN FUNCTION
-// Currently attaching to main.main
-// If that works, want to attach to github.com/cri-o/cri-o/internal/oci.(*runtimeOCI).StartContainer
-// Once container has started, grab the pid and begin enforcement
-
-SEC("uprobe/crio_main")
-int BPF_KPROBE(crio_main_enter)
+// This probe fires upon entering the pid() function located at
+// https://github.com/opencontainers/runc/blob/b802def2f617eeed5c0a21da131e96a6b6095d95/libcontainer/process_linux.go#L310
+// which returns the value of the process id for the container.
+// Unfortunately, dockerd will not call this function that is referenced at
+// https://github.com/opencontainers/runc/blob/b802def2f617eeed5c0a21da131e96a6b6095d95/libcontainer/container_linux.go#L247
+// within the exec() function that is executed when the container starts to run (and where we want to start enforcement).
+// However, the exec function does get called. To get around this issue, the pid is retrieved every time the pid() function
+// is called, but only gets used when the exec() function is called sinc the pid is also retrieved before the exec()
+// function is called. 
+//
+// This does leave us with a potential problem if there are two containers are starting simultaneously and the pid is 
+// overridden for one of the containers. The pid is retrieved by walking through the structs until hitting the Pid field
+SEC("uprobe/runc_get_init_process_pid")
+int BPF_KPROBE(runc_get_init_process_pid_enter)
 {
-
-   //bpf_printk("CRIO MAIN CALL 1 ???");
-
-    return 0;
-}
-
-SEC("uprobe/runc_start_container")
-int BPF_KPROBE(runc_start_container_enter)
-{
-
-    //bpf_printk("RUNC START CONTAINER ???");
-    return 0;
-}
-
-SEC("uprobe/runc_create_container")
-int BPF_KPROBE(runc_create_container_enter)
-{
-    //bpf_printk("RUNC CREATE CONTAINER ???");
-    
-    return 0;
-}
-
-SEC("uprobe/runc_init_proc_probe") //uretprobe??
-int BPF_KPROBE(runc_init_proc_enter)
-{
-
     /*
-    //  
-    //  - The size of explicitly sized basic types (int16, etc.) is the
-    //	  specified size.
-    //	- The size of strings and interfaces is 2*WordSize.
-    //	- The size of slices is 3*WordSize.
-    //	- The size of an array of n elements corresponds to the size of
-    //	  a struct of n consecutive fields of the array's element type.
-    //      - The size of a struct is the offset of the last field plus that
-    //	  field's size. As with all element types, if the struct is used
-    //	  in an array its size must first be aligned to a multiple of the
-    //	  struct's alignment.
-    //	- All other types have size WordSize.
-    //	- Arrays and structs are aligned per spec definition; all other
-    //	  types are naturally aligned with a maximum alignment MaxAlign.
-
-    //    WordSize should be 32 bits
-    //    strings and interfaces are 64 bits
-    //    
+    Structs needed to traverse through
 
     type initProcess struct {
-        cmd             *exec.Cmd           [struct] **************************************************************************************************************
-        messageSockPair filePair            [struct]
-        logFilePair     filePair            [struct]
-        config          *initConfig         [struct]
-        manager         cgroups.Manager     [interface]
-        intelRdtManager *intelrdt.Manager   [struct]
-        container       *linuxContainer     [struct]
-        fds             []string            [array]
-        process         *Process            [struct]
-        bootstrapData   io.Reader           [interface]
-        sharePidns      bool                [bool]
+        cmd             *exec.Cmd <--------- Cmd struct
+        messageSockPair filePair
+        logFilePair     filePair
+        config          *initConfig
+        manager         cgroups.Manager
+        intelRdtManager *intelrdt.Manager
+        container       *linuxContainer
+        fds             []string
+        process         *Process
+        bootstrapData   io.Reader
+        sharePidns      bool
     }
 
     type Cmd struct {
-        Path string                         [String]
-        Args []string                       [Array]
-        Env []string                        [Array]
-        Dir string                          [String]
-        Stdin io.Reader                     [interface]
-        Stdout io.Writer                    [interface]
-        Stderr io.Writer                    [interface]
-        ExtraFiles []*os.File               [Array]
-        SysProcAttr *syscall.SysProcAttr    [struct]
-        Process *os.Process                 [struct] *************************************************************************************************
-        ProcessState *os.ProcessState       [struct]
+        Path            string ------------- 16 bits
+        Args            []string ----------- 24 bits
+        Env             []string ----------- 24 bits
+        Dir             string ------------- 16 bits
+        Stdin           io.Reader ---------- 16 bits
+        Stdout          io.Writer ---------- 16 bits
+        Stderr          io.Writer ---------- 16 bits
+        ExtraFiles      []*os.File --------- 16 bits
+        SysProcAttr     *syscall.SysProcAttr  8 bits
+        Process         *os.Process <--------Process struct
+        ProcessState    *os.ProcessState
     }
-
 
     type Process struct {
-	    Pid int                             [int] ****************************************************************************************************************
-    }
+        Pid int <--------------------------- Process ID of container
+    }*/
 
-    */
+    // The offset in bits between the beginning of the Cmd struct and the location of the Process struct within
+    int process_address_offset = 160;
+    unsigned long long int  address_of_cmd;
+    unsigned long long int value_of_cmd;
+    unsigned long long int address_of_process;
+    unsigned long long int value_of_process;
+    unsigned long long int address_of_pid;
+    int value_of_pid;
 
-    int cmdAddress;
-    int processAddress;
-
-
-    /*bpf_printk("RUNC INIT PROC CONTAINER FINISH");
-    bpf_printk("PT_REGS_PARM1 %x",PT_REGS_PARM1(ctx));
-    bpf_printk("PT_REGS_PARM2 %x",PT_REGS_PARM2(ctx));
-    bpf_printk("PT_REGS_PARM3 %x",PT_REGS_PARM3(ctx));
-    bpf_printk("PT_REGS_PARM4 %x",PT_REGS_PARM4(ctx));
-    bpf_printk("PT_REGS_PARM5 %x",PT_REGS_PARM5(ctx));
-    bpf_printk("PT_REGS_RET %x",PT_REGS_RET(ctx));
-    bpf_printk("PT_REGS_FP %x",PT_REGS_FP(ctx));
-    bpf_printk("PT_REGS_RC %x",PT_REGS_RC(ctx));
-    bpf_printk("PT_REGS_SP %x",PT_REGS_SP(ctx));
-    bpf_printk("PT_REGS_IP %x",PT_REGS_IP(ctx));*/
-    int test;
-    // what to do with return value from PT_REGS_RC(ctx) (return value should be of type initProcess)
-    //bpf_printk("RUNC INIT PROC CONTAINER FINISH");
-    return 0;
+    // As Cmd is the first element in the initProcess struct, the value of the initProcess struct is the address
+    // of the Cmd struct (no offset needed)
+    address_of_cmd = ctx->ax;
+    bpf_probe_read_user(&value_of_cmd, sizeof(value_of_cmd), address_of_cmd);
+    address_of_process = value_of_cmd + process_address_offset;
+    bpf_probe_read_user(&value_of_process, sizeof(value_of_process), address_of_process);
+    address_of_pid = value_of_process;
+    bpf_probe_read_user(&value_of_pid, sizeof(value_of_pid), address_of_pid);
+    PID=value_of_pid;
 }
 
-SEC("uprobe/runc_init_proc_start_probe") 
-int BPF_KPROBE(runc_init_proc_start_enter)
+// This probe fires when the exec() function is called, located at:
+// https://github.com/opencontainers/runc/blob/b802def2f617eeed5c0a21da131e96a6b6095d95/libcontainer/container_linux.go#L245
+// This function is called whenever a process is changing to the running/starting state.
+//
+// Within this function, the pid() function is also called, but for some reason it does not hit the probe when docker
+// is the container engine (for both 'docker run' and 'docker start'). For this reason, the pid that was found in a
+// previous call to the pid() function is used.
+//
+// Possible issue exists in here where if running bpfcontain for the first time in a session, the container fails to run?
+// Maybe due to some race condition where enforcement starts just before the container starts running?
+SEC("uprobe/runc_exec")
+int BPF_KPROBE(runc_exec_enter)
 {
-
-    /*bpf_printk("RUNC INIT PROC CONTAINER START");
-    bpf_printk("PT_REGS_PARM1 %x",PT_REGS_PARM1(ctx));
-    bpf_printk("PT_REGS_PARM2 %x",PT_REGS_PARM2(ctx));
-    bpf_printk("PT_REGS_PARM3 %x",PT_REGS_PARM3(ctx));
-    bpf_printk("PT_REGS_PARM4 %x",PT_REGS_PARM4(ctx));
-    bpf_printk("PT_REGS_PARM5 %x",PT_REGS_PARM5(ctx));
-    bpf_printk("PT_REGS_RET %x",PT_REGS_RET(ctx));
-    bpf_printk("PT_REGS_FP %x",PT_REGS_FP(ctx));
-    bpf_printk("PT_REGS_RC %x",PT_REGS_RC(ctx));
-    bpf_printk("PT_REGS_SP %x",PT_REGS_SP(ctx));
-    bpf_printk("PT_REGS_IP %x",PT_REGS_IP(ctx));
-    bpf_printk("RUNC INIT PROC CONTAINER START");*/
-    int test;
-    // what to do with return value from PT_REGS_RC(ctx) (return value should be of type initProcess)
-    
-    return 0;
-}
-
-SEC("uprobe/runc_wait_for_child_exit")
-int BPF_KPROBE(runc_wait_for_child_exit_enter)
-{
-    bpf_printk("RUNC WAIT FOR CHILD EXIT");
-    PID = ctx->bx;
-    bpf_printk("CONTAINER PID ?? -- %d",PID);
-    /*container_t *container = get_container_by_host_pid(PID);
-    if (!container) {
-        bpf_printk("RUNC PROBE NO CONTAINER?");
+    // If this probe fires without a valid PID (should not happed)
+    if(PID == -1){
+        //bpf_printk("RUNC INVALID PID");
         return 0;
     }
-    container->status = DOCKER_INIT;
-    bpf_printk("RUNC PROBE STATUS INIT");
-    bpf_map_update_elem(&containers, &container->container_id, container, BPF_EXIST);*/
-    return 0;
-}
 
-SEC("uprobe/runc_start")
-int BPF_KPROBE(runc_start_enter)
-{
-    
-    bpf_printk("KEVIN RUNC START HIT");
-
-    bpf_printk("CURRENT STORED GLOBAL PID: %d",PID);
+    // associate container with pid
     container_t *container = get_container_by_host_pid(PID);
+
+    // reset pid
+    PID = -1;
+
     if (!container) {
-        bpf_printk("NOT DOCKER PROBE NO CONTAINER?");
         return 0;
     }
 
+    // update container status and start enforcing
     container->status = DOCKER_STARTED;
-    bpf_printk("NOT DOCKER PROBE STATUS STARTED");
     bpf_map_update_elem(&containers, &container->container_id, container, BPF_EXIST);
-    bpf_printk("NOT DOCKER PROBE END");
-    PID=-1;
+
 	return 0;
 }
-
-SEC("uprobe/runc_destroy")
-int BPF_KPROBE(runc_destroy_enter)
-{
-    
-    bpf_printk("KEVIN RUNC DESTROY HIT");
-}
-/*
-SEC("uprobe/crio_container_running1")
-int BPF_KPROBE(crio_container_running_enter1)
-{
-
-    bpf_printk("CRIO CONTAINER START CALL 1 ???");
-    
-    return 0;
-}
-
-SEC("uprobe/crio_container_running2")
-int BPF_KPROBE(crio_container_running_enter2)
-{
-   bpf_printk("CRIO CONTAINER START CALL 2 ???");
-    
-    return 0;
-}
-
-SEC("uprobe/crio_container_running3")
-int BPF_KPROBE(crio_container_running_enter3)
-{
-
-   bpf_printk("CRIO CONTAINER START CALL 3 ???");
-    
-    return 0;
-}
-
-SEC("uprobe/crio_container_running4")
-int BPF_KPROBE(crio_container_running_enter4)
-{
-
-   bpf_printk("CRIO CONTAINER START CALL 4 ???");
-    
-    return 0;
-}
-
-SEC("uprobe/crio_container_running5")
-int BPF_KPROBE(crio_container_running_enter5)
-{
-
-   bpf_printk("CRIO CONTAINER START CALL 5 ???");
-    
-    return 0;
-}
-
-SEC("uprobe/crio_container_running6")
-int BPF_KPROBE(crio_container_running_enter6)
-{
-
-   bpf_printk("CRIO CONTAINER START CALL 6 ???");
-    
-    return 0;
-}
-
-SEC("uprobe/crio_container_running7")
-int BPF_KPROBE(crio_container_running_enter7)
-{
-
-   bpf_printk("CRIO CONTAINER START CALL 7 ???");
-    
-    return 0;
-}
-
-
-SEC("uprobe/crio_container_running8")
-int BPF_KPROBE(crio_container_running_enter8)
-{
-
-   bpf_printk("CRIO CONTAINER START CALL 8 ???");
-    
-    return 0;
-}
-
-SEC("uprobe/crictl_container_running")
-int BPF_KPROBE(crictl_container_running_enter)
-{
-
-   bpf_printk("CRICTL CONTAINER START CALL 1 ???");
-    
-    return 0;
-}
-
-SEC("uprobe/crictl_main")
-int BPF_KPROBE(crictl_main_enter)
-{
-
-   bpf_printk("CRICTL MAIN CALL 1 ???");
-    
-    return 0;
-}
-*/
 
 SEC("tp/syscalls/sys_enter_sethostname")
 int sys_enter_sethostname(struct trace_event_raw_sys_enter  *ctx)
